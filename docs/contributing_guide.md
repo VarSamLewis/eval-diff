@@ -95,9 +95,9 @@ Ensure all changes are merged into the main branch.
 Update the version tag locally:
 
 ```
-git switch main
-git pull origin main
-git push origin v1 --force
+git switch dev/bump-version
+git commit -m "chore: bump version to 0.0.1"
+git push origin dev/bump-version
 
 ```
 

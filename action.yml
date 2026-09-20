@@ -37,10 +37,8 @@ runs:
       env:
         TYPESAFE_API_KEY: ${{ inputs.typesafe_api_key }}
       run: |
-        # Capture the exact tag/ref used in 'uses: owner/repo@ref'
         IMAGE_TAG="${{ github.action_ref }}"
 
-        # Fallback for local testing or direct branch checkout
         if [ -z "$IMAGE_TAG" ] || [ "$IMAGE_TAG" = "main" ]; then
           IMAGE_TAG="latest"
         fi
