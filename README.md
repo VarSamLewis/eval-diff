@@ -32,7 +32,7 @@ jobs:
 
       - name: Evaluate Git Diff
         id: eval_diff
-        uses: varsamlewis/eval-diff@v1
+        uses: varsamlewis/eval-diff@v0.0.2
         with:
           typesafe_api_key: ${{ secrets.TYPESAFE_API_KEY }}
 
