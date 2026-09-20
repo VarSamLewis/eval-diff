@@ -45,6 +45,22 @@ jobs:
 
 The checkout must fetch `origin/main`, because the action calculates `git diff origin/main...HEAD`. The action runs a Docker container, so the runner also needs Docker and outbound network access to GitHub Container Registry and TypeSafe's API.
 
+## Supported action reference
+
+Use the GitHub Action release tag in workflows—not a container tag and not the TypeSafe HTTP endpoint directly:
+
+```yaml
+uses: varsamlewis/eval-diff@v1
+```
+
+`v1` is the supported rolling major-version tag and receives compatible updates after release validation. To keep a workflow fixed to one release, use an exact action tag instead:
+
+```yaml
+uses: varsamlewis/eval-diff@v0.0.2
+```
+
+Do not use `@latest`; it is not a supported GitHub Action release channel. The GHCR container version is an internal implementation detail selected by the action's checked-in `CONTAINER_VERSION` file. Consumers should not invoke the TypeSafe API or the container image directly unless they have separately integrated and approved those interfaces.
+
 ## Inputs
 
 | Input | Required | Default | Description |
