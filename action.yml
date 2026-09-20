@@ -42,11 +42,6 @@ runs:
       run: |
         git fetch origin ${{ inputs.target_branch }} --depth=1 || true
 
-    - name: Build local container image
-      shell: bash
-      run: |
-        docker build -t eval-diff:action-runner "${{ github.action_path }}"
-
     - name: Generate Diff and Execute Evaluation
       id: eval_step
       shell: bash
@@ -64,7 +59,7 @@ runs:
           -e TYPESAFE_API_KEY="${TYPESAFE_API_KEY}" \
           -e GITHUB_OUTPUT="/tmp/gh_output" \
           -v /tmp:/tmp \
-          eval-diff:action-runner \
+          ghcr.io/varsamlewis/eval-diff:v1 \
           --format="${{ inputs.format }}" \
           --max-chars="${{ inputs.max_chars }}" \
           --dry-run="${{ inputs.dry_run }}"
