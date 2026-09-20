@@ -1,5 +1,5 @@
 name: "Eval Diff"
-description: "Evaluates git diffs using the eval-diff CLI tool"
+description: "Sends Git diffs to the TypeSafe Jev API to evaluate change impact and breaking-change risk"
 inputs:
   typesafe_api_key:
     description: "API key for evaluation service"
