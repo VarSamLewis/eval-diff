@@ -1,70 +1,55 @@
-name: "System One Model Diff Evaluator"
-description: "Evaluates git diff impact severity using a System One Model API"
-author: "VarSamLewis"
-
+name: "Eval Diff"
+description: "Evaluates git diffs using the eval-diff CLI tool"
 inputs:
   typesafe_api_key:
-    description: "TypeSafe Jev API Key"
+    description: "API key for evaluation service"
     required: true
   format:
-    description: "Output format: 'standard', 'score', or 'full'"
+    description: "Output format"
     required: false
     default: "standard"
   max_chars:
-    description: "Maximum character limit for diff content truncation"
+    description: "Maximum diff character limit"
     required: false
-    default: "100000"
+    default: "4000"
   dry_run:
-    description: "Print payload stats without invoking the API"
+    description: "Run without calling external API"
     required: false
     default: "false"
-  target_branch:
-    description: "Target branch for comparison (defaults to PR base ref or main)"
-    required: false
-    default: "${{ github.base_ref || 'main' }}"
 
 outputs:
   impact_score:
-    description: "Impact score on a 1.0 - 5.0 scale"
+    description: "Impact score"
     value: ${{ steps.eval_step.outputs.impact_score }}
   confidence:
-    description: "Model confidence rating (0.0 - 1.0)"
+    description: "Confidence score"
     value: ${{ steps.eval_step.outputs.confidence }}
   is_breaking:
-    description: "Boolean flag indicating high probability of breaking changes"
+    description: "Breaking change flag"
     value: ${{ steps.eval_step.outputs.is_breaking }}
 
 runs:
   using: "composite"
   steps:
-    - name: Ensure target branch ref is present
-      shell: bash
-      run: |
-        git fetch origin ${{ inputs.target_branch }} --depth=1 || true
-
-    - name: Generate Diff and Execute Evaluation
+    - name: Run Docker Container
       id: eval_step
       shell: bash
       env:
         TYPESAFE_API_KEY: ${{ inputs.typesafe_api_key }}
       run: |
-        DIFF_OUTPUT=$(git diff origin/${{ inputs.target_branch }}...HEAD)
-
-        if [ -z "$DIFF_OUTPUT" ]; then
-          echo "No diff detected between HEAD and origin/${{ inputs.target_branch }}."
-          exit 0
+        # Fall back to 'latest' if action_ref is empty (e.g., local testing)
+        IMAGE_TAG="${{ github.action_ref }}"
+        if [ -z "$IMAGE_TAG" ] || [ "$IMAGE_TAG" = "main" ]; then
+          IMAGE_TAG="latest"
         fi
+
+        DIFF_OUTPUT=$(git diff origin/main...HEAD)
 
         echo "$DIFF_OUTPUT" | docker run --rm -i \
           -e TYPESAFE_API_KEY="${TYPESAFE_API_KEY}" \
           -e GITHUB_OUTPUT="/tmp/gh_output" \
           -v /tmp:/tmp \
-          ghcr.io/varsamlewis/eval-diff:v1 \
+          "ghcr.io/varsamlewis/eval-diff:${IMAGE_TAG}" \
           --format="${{ inputs.format }}" \
           --max-chars="${{ inputs.max_chars }}" \
           --dry-run="${{ inputs.dry_run }}"
-
-        if [ -f /tmp/gh_output ]; then
-          cat /tmp/gh_output >> $GITHUB_OUTPUT
-          rm -f /tmp/gh_output
-        fi
