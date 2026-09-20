@@ -1,28 +1,21 @@
-name: Test Local Action
+name: PR Diff Impact Evaluation
 
 on:
   pull_request:
     branches: [main]
-  workflow_dispatch:
 
 jobs:
-  test-eval-diff:
+  evaluate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Evaluate Diff via Local Action
+      - name: Evaluate PR Diff
         id: eval
         uses: ./
         with:
           typesafe_api_key: ${{ secrets.TYPESAFE_API_KEY }}
           format: "standard"
-          dry_run: "true"
-
-      - name: Verify Action Outputs
-        run: |
-          echo "Score: ${{ steps.eval.outputs.impact_score }}"
-          echo "Is Breaking: ${{ steps.eval.outputs.is_breaking }}"

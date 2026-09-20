@@ -1,5 +1,5 @@
 name: "System One Model Diff Evaluator"
-description: "Evaluates git diff impact severity using the TypeSafe Jev API"
+description: "Evaluates git diff impact severity using a System One Model API"
 author: "VarSamLewis"
 
 inputs:
@@ -18,30 +18,58 @@ inputs:
     description: "Print payload stats without invoking the API"
     required: false
     default: "false"
-  diff_content:
-    description: "Direct diff string or piped content to evaluate"
+  target_branch:
+    description: "Target branch for comparison (defaults to PR base ref or main)"
     required: false
+    default: "${{ github.base_ref || 'main' }}"
 
 outputs:
   impact_score:
     description: "Impact score on a 1.0 - 5.0 scale"
+    value: ${{ steps.eval_step.outputs.impact_score }}
   confidence:
     description: "Model confidence rating (0.0 - 1.0)"
+    value: ${{ steps.eval_step.outputs.confidence }}
   is_breaking:
     description: "Boolean flag indicating high probability of breaking changes"
+    value: ${{ steps.eval_step.outputs.is_breaking }}
 
 runs:
-  using: "docker"
-  image: "Dockerfile"
-  env:
-    TYPESAFE_API_KEY: ${{ inputs.typesafe_api_key }}
-  args:
-    - "--format"
-    - ${{ inputs.format }}
-    - "--max-chars"
-    - ${{ inputs.max_chars }}
-    - ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
+  using: "composite"
+  steps:
+    - name: Ensure target branch ref is present
+      shell: bash
+      run: |
+        git fetch origin ${{ inputs.target_branch }} --depth=1 || true
 
-branding:
-  icon: "cpu"
-  color: "blue"
+    - name: Build local container image
+      shell: bash
+      run: |
+        docker build -t eval-diff:action-runner "${{ github.action_path }}"
+
+    - name: Generate Diff and Execute Evaluation
+      id: eval_step
+      shell: bash
+      env:
+        TYPESAFE_API_KEY: ${{ inputs.typesafe_api_key }}
+      run: |
+        DIFF_OUTPUT=$(git diff origin/${{ inputs.target_branch }}...HEAD)
+
+        if [ -z "$DIFF_OUTPUT" ]; then
+          echo "No diff detected between HEAD and origin/${{ inputs.target_branch }}."
+          exit 0
+        fi
+
+        echo "$DIFF_OUTPUT" | docker run --rm -i \
+          -e TYPESAFE_API_KEY="${TYPESAFE_API_KEY}" \
+          -e GITHUB_OUTPUT="/tmp/gh_output" \
+          -v /tmp:/tmp \
+          eval-diff:action-runner \
+          --format="${{ inputs.format }}" \
+          --max-chars="${{ inputs.max_chars }}" \
+          --dry-run="${{ inputs.dry_run }}"
+
+        if [ -f /tmp/gh_output ]; then
+          cat /tmp/gh_output >> $GITHUB_OUTPUT
+          rm -f /tmp/gh_output
+        fi
