@@ -1,4 +1,4 @@
-name: PR Diff Impact Evaluation
+name: Validate Action
 
 on:
   pull_request:
@@ -15,7 +15,29 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Evaluate PR Diff
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l src tests)"
+
+      - name: Run static analysis
+        run: go vet ./...
+
+      - name: Run unit tests
+        run: go test ./...
+
+      - name: Build action image from this pull request
+        run: docker build -t eval-diff:pr .
+
+      - name: Smoke-test the image built from this pull request
+        run: git diff origin/main...HEAD | docker run --rm -i eval-diff:pr --dry-run=true
+
+      - name: Run external API integration test
+        if: ${{ secrets.TYPESAFE_API_KEY != '' }}
         id: eval
         uses: ./
         with:

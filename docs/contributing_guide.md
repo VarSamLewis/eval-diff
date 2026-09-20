@@ -45,6 +45,8 @@ make test
 
 ```
 
+Pull requests also run formatting, static analysis, unit tests, a Docker build, a dry-run smoke test of the image built from the pull request, and an API integration test when `TYPESAFE_API_KEY` is available. The image smoke test does not require the API key.
+
 Format source code:
 
 ```
@@ -106,6 +108,8 @@ ghcr.io/varsamlewis/eval-diff:v<CONTAINER_VERSION>
 ```
 
 The workflow does not create, update, or force-push Git tags.
+
+The release workflow serializes image publication for a Git ref, verifies that the tagged image is available after push, and records the image digest in the GitHub Actions job summary.
 
 ### Publish an action release
 

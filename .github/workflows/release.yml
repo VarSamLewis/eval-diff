@@ -3,6 +3,10 @@ name: Release Docker Image
 on:
   workflow_dispatch:
 
+concurrency:
+  group: publish-container-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -29,9 +33,19 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Push Docker Image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
             ghcr.io/varsamlewis/eval-diff:${{ steps.container_version.outputs.tag }}
+
+      - name: Verify published image
+        run: docker buildx imagetools inspect "ghcr.io/varsamlewis/eval-diff:${{ steps.container_version.outputs.tag }}"
+
+      - name: Write release summary
+        run: |
+          echo "## Container image published" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag: \`ghcr.io/varsamlewis/eval-diff:${{ steps.container_version.outputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Digest: \`${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
