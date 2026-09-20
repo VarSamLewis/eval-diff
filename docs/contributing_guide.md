@@ -107,6 +107,8 @@ ghcr.io/varsamlewis/eval-diff:v<CONTAINER_VERSION>
 
 The workflow does not create, update, or force-push Git tags.
 
+After publishing, retrieve the image's SHA-256 digest and record it in `CONTAINER_DIGEST`. Action releases pull the digest, not the mutable version tag. Publish the action release only after the digest change is merged and tested.
+
 ### Publish an action release
 
 Create a GitHub release with a new immutable action tag, such as `v0.0.3`, and select the Marketplace publishing option when appropriate. Update the rolling `v1` tag only after verifying that release. The action source at a release tag includes its `CONTAINER_VERSION` file, which makes its selected container image explicit.

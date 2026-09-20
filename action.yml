@@ -41,26 +41,32 @@ runs:
       env:
         TYPESAFE_API_KEY: ${{ inputs.typesafe_api_key }}
       run: |
-        CONTAINER_VERSION_FILE="${{ github.action_path }}/CONTAINER_VERSION"
-        if [ ! -r "$CONTAINER_VERSION_FILE" ]; then
-          echo "::error::CONTAINER_VERSION file is missing or unreadable"
+        CONTAINER_DIGEST_FILE="${{ github.action_path }}/CONTAINER_DIGEST"
+        if [ ! -r "$CONTAINER_DIGEST_FILE" ]; then
+          echo "::error::CONTAINER_DIGEST file is missing or unreadable"
           exit 1
         fi
-        CONTAINER_VERSION="$(tr -d '\r\n' < "$CONTAINER_VERSION_FILE")"
-        if [ -z "$CONTAINER_VERSION" ]; then
-          echo "::error::CONTAINER_VERSION must not be empty"
+        CONTAINER_DIGEST="$(tr -d '\r\n' < "$CONTAINER_DIGEST_FILE")"
+        if ! [[ "$CONTAINER_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+          echo "::error::CONTAINER_DIGEST must be a sha256 image digest"
           exit 1
         fi
 
-        IMAGE_TAG="v${CONTAINER_VERSION}"
+        IMAGE_REF="ghcr.io/varsamlewis/eval-diff@${CONTAINER_DIGEST}"
+
+        if [ -z "${GITHUB_OUTPUT:-}" ] || [ ! -w "$GITHUB_OUTPUT" ]; then
+          echo "::error::GitHub Actions output file is unavailable"
+          exit 1
+        fi
 
         DIFF_OUTPUT=$(git diff origin/main...HEAD)
 
         echo "$DIFF_OUTPUT" | docker run --rm -i \
+          --user "$(id -u):$(id -g)" \
           -e TYPESAFE_API_KEY="${TYPESAFE_API_KEY}" \
-          -e GITHUB_OUTPUT="/tmp/gh_output" \
-          -v /tmp:/tmp \
-          "ghcr.io/varsamlewis/eval-diff:${IMAGE_TAG}" \
+          -e GITHUB_OUTPUT="/github-output" \
+          -v "$GITHUB_OUTPUT:/github-output:rw" \
+          "$IMAGE_REF" \
           --format="${{ inputs.format }}" \
           --max-chars="${{ inputs.max_chars }}" \
           --dry-run="${{ inputs.dry_run }}"

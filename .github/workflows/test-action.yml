@@ -15,9 +15,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Build action image from this pull request
+        run: docker build -t eval-diff:pr .
+
+      - name: Smoke-test the image built from this pull request
+        run: git diff origin/main...HEAD | docker run --rm -i eval-diff:pr --dry-run=true
+
       - name: Evaluate PR Diff
         id: eval
         uses: ./
         with:
-          typesafe_api_key: ${{ secrets.TYPESAFE_API_KEY }}
           format: "standard"
+          dry_run: true

@@ -68,6 +68,8 @@ Unless `dry_run` is enabled, the action sends the evaluated Git diff to the thir
 
 `--max-chars` reduces the amount sent, but it does not redact sensitive data and may omit relevant changes. The result is an advisory signal—not a substitute for code review, testing, security review, or change-control processes.
 
+The action pulls its runtime container by an immutable image digest stored in `CONTAINER_DIGEST`, rather than a mutable container tag. It mounts only GitHub Actions' output file into that container.
+
 See [security, privacy, and operational considerations](docs/security_and_data_handling.md) before enabling the action, especially for private repositories or regulated codebases.
 
 ## Limits and failure behavior
