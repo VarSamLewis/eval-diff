@@ -1,37 +1,84 @@
-System One Model Diff Evaluator
+# Eval Diff
 
-The System One Model Diff Evaluator is a GitHub Action and CLI tool that analyzes git diffs to assess impact severity, risk, and breaking changes.
+Evaluate a Git diff for change impact and potential breaking changes using the TypeSafe Jev API.
 
-Features
+This action compares `origin/main...HEAD`, sends the resulting diff to the evaluation service, and returns an impact score, confidence score, and breaking-change flag.
 
-Analyzes code diffs against a target git branch.
+## Usage
 
-Calls the TypeSafe Jev API to compute an impact score and confidence level.
+Add the action after checking out the repository with its history available:
 
-Identifies potential breaking changes automatically.
+```yaml
+name: Evaluate diff
 
-Runs as a pre-compiled container image on GitHub Container Registry for fast execution.
+on:
+  pull_request:
 
-Includes a standalone CLI binary for local development and workflow integration.
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-Basic Usage
+      - name: Evaluate Git Diff
+        id: eval_diff
+        uses: varsamlewis/eval-diff@v1
+        with:
+          typesafe_api_key: ${{ secrets.TYPESAFE_API_KEY }}
 
+      - name: Show evaluation
+        run: |
+          echo "Impact: ${{ steps.eval_diff.outputs.impact_score }}"
+          echo "Confidence: ${{ steps.eval_diff.outputs.confidence }}"
+          echo "Breaking change: ${{ steps.eval_diff.outputs.is_breaking }}"
 ```
-To use this action in a GitHub Actions workflow, add the following step:
 
-- name: Checkout code
-  uses: actions/checkout@v4
-  with:
-    fetch-depth: 0
+The checkout must fetch `origin/main`, because the action calculates `git diff origin/main...HEAD`. The action runs a Docker container, so the runner also needs Docker and outbound network access to GitHub Container Registry and TypeSafe's API.
 
-- name: Evaluate Git Diff
-  uses: varsamlewis/eval-diff@v1
+## Inputs
+
+| Input | Required | Default | Description |
+| --- | --- | --- | --- |
+| `typesafe_api_key` | Yes | — | API key for the TypeSafe evaluation service. Store it as a GitHub Actions secret. |
+| `format` | No | `standard` | CLI output format: `standard`, `score`, or `full`. |
+| `max_chars` | No | `4000` | Maximum number of diff characters evaluated. Content beyond the limit is omitted. |
+| `dry_run` | No | `false` | When `true`, reports payload statistics without calling the external API. |
+
+## Outputs
+
+| Output | Description |
+| --- | --- |
+| `impact_score` | Model-generated impact score on a 1–5 scale. |
+| `confidence` | Model-generated confidence score. |
+| `is_breaking` | `true` when the model's breaking-change probability is greater than `0.8`; otherwise `false`. |
+
+## Security and data handling
+
+Unless `dry_run` is enabled, the action sends the evaluated Git diff to the third-party TypeSafe Jev API. Diffs can include proprietary code, security fixes, internal paths, or accidentally committed secrets. Run this action only when you are authorized to disclose that material to TypeSafe and its service providers.
+
+`--max-chars` reduces the amount sent, but it does not redact sensitive data and may omit relevant changes. The result is an advisory signal—not a substitute for code review, testing, security review, or change-control processes.
+
+See [security, privacy, and operational considerations](docs/security_and_data_handling.md) before enabling the action, especially for private repositories or regulated codebases.
+
+## Limits and failure behavior
+
+The action uses only the first `max_chars` characters of the diff. The default is 4,000 characters. The API client uses a 15-second timeout. Missing history, Docker failures, registry/network failures, API errors, or an invalid response cause the evaluation step to fail.
+
+For a no-transmission check, set `dry_run: true`:
+
+```yaml
+- uses: varsamlewis/eval-diff@v1
   with:
     typesafe_api_key: ${{ secrets.TYPESAFE_API_KEY }}
+    dry_run: true
 ```
 
-Documentation
+## Documentation
 
-Development, building, testing, and releasing: see docs/CONTRIBUTING.md
-
-Local CLI usage and flags: see docs/CLI.md
+- [Security, privacy, and data handling](docs/security_and_data_handling.md)
+- [CLI guide](docs/cli_guide.md)
+- [Contributing guide](docs/contributing_guide.md)

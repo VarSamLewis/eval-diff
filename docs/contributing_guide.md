@@ -2,6 +2,10 @@
 
 This document describes how to make changes, build, test, and release the action.
 
+## Safe Testing
+
+Use `--dry-run=true` for local development unless you have approval to transmit the test input to the third-party TypeSafe Jev API. A normal evaluation sends the supplied diff or files and an API bearer token to that service. Do not use production code, credentials, customer data, or unreviewed security fixes as test input. See the [README security considerations](../README.md#security-privacy-and-risk-considerations) for the full risk summary.
+
 Prerequisites
 
 - Go 1.22 or higher

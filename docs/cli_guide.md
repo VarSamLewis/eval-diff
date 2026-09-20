@@ -2,6 +2,10 @@
 
 The evaluation engine is packaged as a Go command-line tool. It reads a git diff from standard input (stdin) and evaluates the content.
 
+## Data Handling and Security
+
+Unless `--dry-run=true` is used, the CLI sends the supplied standard input or full contents of specified files to the third-party TypeSafe Jev API. Review the [security, privacy, and data-handling guide](security_and_data_handling.md) before sending proprietary or sensitive material. Dry-run mode reports payload statistics without transmitting content or requiring an API key.
+
 Installation
 
 Compile the binary using make:
