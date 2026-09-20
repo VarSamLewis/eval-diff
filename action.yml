@@ -59,7 +59,7 @@ runs:
           -e TYPESAFE_API_KEY="${TYPESAFE_API_KEY}" \
           -e GITHUB_OUTPUT="/tmp/gh_output" \
           -v /tmp:/tmp \
-          ghcr.io/varsamlewis/eval-diff:v1 \
+          ghcr.io/varsamlewis/eval-diff:v0.0.1 \
           --format="${{ inputs.format }}" \
           --max-chars="${{ inputs.max_chars }}" \
           --dry-run="${{ inputs.dry_run }}"
