@@ -97,7 +97,6 @@ Update the version tag locally:
 ```
 git switch main
 git pull origin main
-git tag -a v1 -m "Release v1" -f
 git push origin v1 --force
 
 ```
