@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -43,11 +45,18 @@ type JevResponse struct {
 }
 
 type Answer struct {
-	Type       string  `json:"type"`
-	Score      float64 `json:"score,omitempty"`
-	Noul       float64 `json:"noul,omitempty"`
-	Confidence float64 `json:"confidence"`
+	Type       string   `json:"type"`
+	Score      *float64 `json:"score,omitempty"`
+	Noul       *float64 `json:"noul,omitempty"`
+	Confidence *float64 `json:"confidence"`
 }
+
+const (
+	apiEndpoint     = "https://api.typesafe.ai/v1/systemone"
+	apiTimeout      = 15 * time.Second
+	maxAPIAttempts  = 3
+	apiRetryBackoff = 500 * time.Millisecond
+)
 
 var cfg Config
 
@@ -98,10 +107,13 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		scoreAns := jevResp.Answers["impact_score"]
-		breakingAns := jevResp.Answers["has_breaking_changes"]
+		scoreAns, breakingAns, err := validateAPIResponse(jevResp)
+		if err != nil {
+			logError(cfg.Format, err.Error())
+			os.Exit(1)
+		}
 
-		handleOutput(cfg, scoreAns.Score, scoreAns.Confidence, breakingAns.Noul, rawBody)
+		handleOutput(cfg, *scoreAns.Score, *scoreAns.Confidence, *breakingAns.Noul, rawBody)
 	},
 }
 
@@ -140,6 +152,9 @@ func loadEnvFile(filename string) {
 }
 
 func validateEnv(cfg *Config) error {
+	if cfg.MaxChars < 0 {
+		return fmt.Errorf("max-chars must be zero or greater")
+	}
 	if cfg.APIKey == "" && !cfg.DryRun {
 		return fmt.Errorf("TYPESAFE_API_KEY environment variable is not set")
 	}
@@ -148,33 +163,54 @@ func validateEnv(cfg *Config) error {
 
 func readInput(cfg Config) (string, error) {
 	if len(cfg.Files) > 0 {
-		return readFiles(cfg.Files)
+		return readFiles(cfg.Files, cfg.MaxChars)
 	}
-	return readStdin()
+	return readStdin(cfg.MaxChars)
 }
 
-func readFiles(files []string) (string, error) {
+func readFiles(files []string, maxChars int) (string, error) {
 	var builder strings.Builder
+	limit := int64(maxChars) + 1
 	for _, filePath := range files {
-		data, err := os.ReadFile(filePath)
+		if int64(builder.Len()) >= limit {
+			break
+		}
+
+		file, err := os.Open(filePath)
 		if err != nil {
 			return "", fmt.Errorf("Failed to read file %s: %w", filePath, err)
 		}
-		builder.Write(data)
-		builder.WriteString("\n")
+
+		remaining := limit - int64(builder.Len())
+		_, copyErr := io.CopyN(&builder, file, remaining)
+		closeErr := file.Close()
+		if copyErr != nil && !errors.Is(copyErr, io.EOF) {
+			return "", fmt.Errorf("Failed to read file %s: %w", filePath, copyErr)
+		}
+		if closeErr != nil {
+			return "", fmt.Errorf("Failed to close file %s: %w", filePath, closeErr)
+		}
+		if int64(builder.Len()) < limit {
+			builder.WriteString("\n")
+		}
 	}
 	return builder.String(), nil
 }
 
-func readStdin() (string, error) {
+func readStdin(maxChars int) (string, error) {
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) != 0 {
 		return "", fmt.Errorf("No file arguments passed and no input piped via stdin")
 	}
 
-	stdinBytes, err := io.ReadAll(os.Stdin)
+	// Retain only enough input to determine whether truncation is required. Drain
+	// the remainder so piped producers do not fail with SIGPIPE under pipefail.
+	stdinBytes, err := io.ReadAll(io.LimitReader(os.Stdin, int64(maxChars)+1))
 	if err != nil {
 		return "", fmt.Errorf("Failed to read standard input: %w", err)
+	}
+	if _, err := io.Copy(io.Discard, os.Stdin); err != nil {
+		return "", fmt.Errorf("Failed to drain standard input: %w", err)
 	}
 	return string(stdinBytes), nil
 }
@@ -219,31 +255,61 @@ func sendAPIRequest(apiKey, content string) ([]byte, error) {
 		return nil, fmt.Errorf("Failed to serialize request payload: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", "https://api.typesafe.ai/v1/systemone", bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		return nil, fmt.Errorf("Failed to construct HTTP request: %w", err)
+	client := &http.Client{Timeout: apiTimeout}
+	for attempt := 1; attempt <= maxAPIAttempts; attempt++ {
+		req, err := http.NewRequest(http.MethodPost, apiEndpoint, bytes.NewReader(jsonPayload))
+		if err != nil {
+			return nil, fmt.Errorf("failed to construct API request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			if attempt < maxAPIAttempts {
+				time.Sleep(apiRetryBackoff * time.Duration(attempt))
+				continue
+			}
+			if errors.Is(err, context.DeadlineExceeded) {
+				return nil, fmt.Errorf("TypeSafe API request timed out after %s", apiTimeout)
+			}
+			return nil, fmt.Errorf("TypeSafe API request failed after %d attempts: %w", attempt, err)
+		}
+
+		body, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read TypeSafe API response: %w", readErr)
+		}
+		if resp.StatusCode == http.StatusOK {
+			return body, nil
+		}
+		if isRetryableStatus(resp.StatusCode) && attempt < maxAPIAttempts {
+			time.Sleep(apiRetryBackoff * time.Duration(attempt))
+			continue
+		}
+		return nil, apiStatusError(resp.StatusCode, attempt)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	return nil, fmt.Errorf("TypeSafe API request failed")
+}
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("API request failed: %w", err)
+func isRetryableStatus(statusCode int) bool {
+	return statusCode == http.StatusTooManyRequests || statusCode >= http.StatusInternalServerError
+}
+
+func apiStatusError(statusCode, attempts int) error {
+	switch statusCode {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return fmt.Errorf("TypeSafe API authentication failed; check TYPESAFE_API_KEY")
+	case http.StatusTooManyRequests:
+		return fmt.Errorf("TypeSafe API rate limit exceeded after %d attempts; retry later", attempts)
+	default:
+		if statusCode >= http.StatusInternalServerError {
+			return fmt.Errorf("TypeSafe API is unavailable (HTTP %d) after %d attempts", statusCode, attempts)
+		}
+		return fmt.Errorf("TypeSafe API rejected the request (HTTP %d)", statusCode)
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, string(body))
-	}
-
-	return body, nil
 }
 
 func parseAPIResponse(body []byte) (JevResponse, error) {
@@ -252,6 +318,19 @@ func parseAPIResponse(body []byte) (JevResponse, error) {
 		return resp, fmt.Errorf("Failed to parse JSON response: %w", err)
 	}
 	return resp, nil
+}
+
+func validateAPIResponse(resp JevResponse) (Answer, Answer, error) {
+	scoreAns, scoreFound := resp.Answers["impact_score"]
+	if !scoreFound || scoreAns.Score == nil || scoreAns.Confidence == nil {
+		return Answer{}, Answer{}, fmt.Errorf("TypeSafe API response is missing a complete impact_score answer")
+	}
+
+	breakingAns, breakingFound := resp.Answers["has_breaking_changes"]
+	if !breakingFound || breakingAns.Noul == nil {
+		return Answer{}, Answer{}, fmt.Errorf("TypeSafe API response is missing a complete has_breaking_changes answer")
+	}
+	return scoreAns, breakingAns, nil
 }
 
 func printDryRun(cfg Config, charLen int) {

@@ -6,8 +6,12 @@ branding:
   
 inputs:
   typesafe_api_key:
-    description: "API key for evaluation service"
-    required: true
+    description: "API key for evaluation service; required unless dry_run is true"
+    required: false
+  base_ref:
+    description: "Git ref used as the diff base"
+    required: false
+    default: "origin/main"
   format:
     description: "Output format"
     required: false
@@ -54,9 +58,13 @@ runs:
 
         IMAGE_TAG="v${CONTAINER_VERSION}"
 
-        DIFF_OUTPUT=$(git diff origin/main...HEAD)
+        BASE_REF="${{ inputs.base_ref }}"
+        if [ -z "$BASE_REF" ] || ! git rev-parse --verify --quiet --end-of-options "${BASE_REF}^{commit}" > /dev/null; then
+          echo "::error::Diff base ref '$BASE_REF' is unavailable. Check out the base ref and sufficient history."
+          exit 1
+        fi
 
-        echo "$DIFF_OUTPUT" | docker run --rm -i \
+        git diff "${BASE_REF}...HEAD" | docker run --rm -i \
           -e TYPESAFE_API_KEY="${TYPESAFE_API_KEY}" \
           -e GITHUB_OUTPUT="/tmp/gh_output" \
           -v /tmp:/tmp \

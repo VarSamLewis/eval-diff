@@ -49,10 +49,11 @@ The checkout must fetch `origin/main`, because the action calculates `git diff o
 
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `typesafe_api_key` | Yes | — | API key for the TypeSafe evaluation service. Store it as a GitHub Actions secret. |
+| `typesafe_api_key` | Conditional | — | API key for the TypeSafe evaluation service. Required unless `dry_run` is `true`; store it as a GitHub Actions secret. |
+| `base_ref` | No | `origin/main` | Git ref used as the diff base. The ref and its merge-base history must be available in the checkout. |
 | `format` | No | `standard` | CLI output format: `standard`, `score`, or `full`. |
 | `max_chars` | No | `4000` | Maximum number of diff characters evaluated. Content beyond the limit is omitted. |
-| `dry_run` | No | `false` | When `true`, reports payload statistics without calling the external API. |
+| `dry_run` | No | `false` | When `true`, reports payload statistics without calling the external API or requiring an API key. |
 
 ## Outputs
 
@@ -72,14 +73,13 @@ See [security, privacy, and operational considerations](docs/security_and_data_h
 
 ## Limits and failure behavior
 
-The action uses only the first `max_chars` characters of the diff. The default is 4,000 characters. The API client uses a 15-second timeout. Missing history, Docker failures, registry/network failures, API errors, or an invalid response cause the evaluation step to fail.
+The action uses only the first `max_chars` characters of the diff. The default is 4,000 characters. The API client uses a 15-second timeout and retries temporary network failures, rate limits, and server errors up to three times. Missing history, Docker failures, registry/network failures, permanent API errors, or an invalid response cause the evaluation step to fail.
 
 For a no-transmission check, set `dry_run: true`:
 
 ```yaml
 - uses: varsamlewis/eval-diff@v1
   with:
-    typesafe_api_key: ${{ secrets.TYPESAFE_API_KEY }}
     dry_run: true
 ```
 
