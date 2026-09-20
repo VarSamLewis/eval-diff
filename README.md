@@ -4,6 +4,12 @@ Evaluate a Git diff for change impact and potential breaking changes using the T
 
 This action compares `origin/main...HEAD`, sends the resulting diff to the evaluation service, and returns an impact score, confidence score, and breaking-change flag.
 
+## Note
+
+This codebase is still pre v1.0.0 and should not be used for anything beyond testing and POC. 
+
+It has a few surface layers left to harden and some performance improvements before use on large code bases.  
+
 ## Usage
 
 Add the action after checking out the repository with its history available:
