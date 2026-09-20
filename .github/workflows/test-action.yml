@@ -15,7 +15,7 @@ jobs:
 
       - name: Evaluate PR Diff
         id: eval
-        uses: varsamlewis/eval-diff@
+        uses: varsamlewis/eval-diff@latest
         with:
           typesafe_api_key: ${{ secrets.TYPESAFE_API_KEY }}
           format: "standard"
