@@ -19,8 +19,3 @@ jobs:
         with:
           typesafe_api_key: ${{ secrets.TYPESAFE_API_KEY }}
           format: "standard"
-
-      - name: Log Severity Score
-        run: |
-          echo "Score: ${{ steps.eval.outputs.impact_score }}"
-          echo "Breaking: ${{ steps.eval.outputs.is_breaking }}"
