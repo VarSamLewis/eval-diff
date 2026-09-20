@@ -1,5 +1,9 @@
 name: "Eval Diff"
 description: "Sends Git diffs to the TypeSafe Jev API to evaluate change impact and breaking-change risk"
+branding:
+  icon: "activity"
+  color: "purple"
+  
 inputs:
   typesafe_api_key:
     description: "API key for evaluation service"
