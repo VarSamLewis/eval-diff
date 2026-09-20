@@ -1,0 +1,47 @@
+name: "System One Model Diff Evaluator"
+description: "Evaluates git diff impact severity using the TypeSafe Jev API"
+author: "VarSamLewis"
+
+inputs:
+  typesafe_api_key:
+    description: "TypeSafe Jev API Key"
+    required: true
+  format:
+    description: "Output format: 'standard', 'score', or 'full'"
+    required: false
+    default: "standard"
+  max_chars:
+    description: "Maximum character limit for diff content truncation"
+    required: false
+    default: "100000"
+  dry_run:
+    description: "Print payload stats without invoking the API"
+    required: false
+    default: "false"
+  diff_content:
+    description: "Direct diff string or piped content to evaluate"
+    required: false
+
+outputs:
+  impact_score:
+    description: "Impact score on a 1.0 - 5.0 scale"
+  confidence:
+    description: "Model confidence rating (0.0 - 1.0)"
+  is_breaking:
+    description: "Boolean flag indicating high probability of breaking changes"
+
+runs:
+  using: "docker"
+  image: "Dockerfile"
+  env:
+    TYPESAFE_API_KEY: ${{ inputs.typesafe_api_key }}
+  args:
+    - "--format"
+    - ${{ inputs.format }}
+    - "--max-chars"
+    - ${{ inputs.max_chars }}
+    - ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
+
+branding:
+  icon: "cpu"
+  color: "blue"

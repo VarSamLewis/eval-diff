@@ -1,0 +1,21 @@
+# Binary outputs
+/bin/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Go build & test artifacts
+*.exe
+*.exe.test
+*.out
+*.test
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
