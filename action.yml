@@ -41,11 +41,18 @@ runs:
       env:
         TYPESAFE_API_KEY: ${{ inputs.typesafe_api_key }}
       run: |
-        IMAGE_TAG="${{ github.action_ref }}"
-
-        if [ -z "$IMAGE_TAG" ] || [ "$IMAGE_TAG" = "main" ]; then
-          IMAGE_TAG="latest"
+        CONTAINER_VERSION_FILE="${{ github.action_path }}/CONTAINER_VERSION"
+        if [ ! -r "$CONTAINER_VERSION_FILE" ]; then
+          echo "::error::CONTAINER_VERSION file is missing or unreadable"
+          exit 1
         fi
+        CONTAINER_VERSION="$(tr -d '\r\n' < "$CONTAINER_VERSION_FILE")"
+        if [ -z "$CONTAINER_VERSION" ]; then
+          echo "::error::CONTAINER_VERSION must not be empty"
+          exit 1
+        fi
+
+        IMAGE_TAG="v${CONTAINER_VERSION}"
 
         DIFF_OUTPUT=$(git diff origin/main...HEAD)
 

@@ -7,6 +7,8 @@ on:
 jobs:
   evaluate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -15,7 +17,7 @@ jobs:
 
       - name: Evaluate PR Diff
         id: eval
-        uses: varsamlewis/eval-diff@latest
+        uses: ./
         with:
           typesafe_api_key: ${{ secrets.TYPESAFE_API_KEY }}
           format: "standard"

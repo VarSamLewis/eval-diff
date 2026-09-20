@@ -7,29 +7,19 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       packages: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Read Version
-        id: get_version
+      - name: Read Container Version
+        id: container_version
         run: |
-          VERSION=$(cat VERSION | tr -d '\n\r')
-          echo "version=v${VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Create and Push Git Tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git tag -f ${{ steps.get_version.outputs.version }}
-          git push origin ${{ steps.get_version.outputs.version }} --force
-
-          git tag -f latest
-          git push origin latest --force
+          VERSION=$(tr -d '\n\r' < CONTAINER_VERSION)
+          test -n "$VERSION"
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -44,5 +34,4 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/varsamlewis/eval-diff:latest
-            ghcr.io/varsamlewis/eval-diff:${{ steps.get_version.outputs.version }}
+            ghcr.io/varsamlewis/eval-diff:${{ steps.container_version.outputs.tag }}

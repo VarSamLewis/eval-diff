@@ -94,15 +94,19 @@ Release Process
 
 The action uses a pre-built Docker image hosted on GitHub Container Registry.
 
-Ensure all changes are merged into the main branch.
+Git action releases and container releases are versioned separately. GitHub release tags (for example, `v0.0.3`) determine the version users reference with `uses: varsamlewis/eval-diff@...`. The `CONTAINER_VERSION` file determines the container image tag the action pulls.
 
-Update the version tag locally:
+### Publish a container image
 
-```
-git switch dev/bump-version
-git commit -m "chore: bump version to 0.0.1"
-git push origin dev/bump-version
+Update `CONTAINER_VERSION`, merge the change to `main`, then manually run `.github/workflows/release.yml`. It publishes only this version-specific image tag:
 
 ```
+ghcr.io/varsamlewis/eval-diff:v<CONTAINER_VERSION>
 
-The release workflow in .github/workflows/release.yml triggers on the tag push, compiles the binary inside Docker, and pushes the image tag ghcr.io/varsamlewis/eval-diff:v1 to GitHub Container Registry.
+```
+
+The workflow does not create, update, or force-push Git tags.
+
+### Publish an action release
+
+Create a GitHub release with a new immutable action tag, such as `v0.0.3`, and select the Marketplace publishing option when appropriate. Update the rolling `v1` tag only after verifying that release. The action source at a release tag includes its `CONTAINER_VERSION` file, which makes its selected container image explicit.
